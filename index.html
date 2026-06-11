@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IN-SPACe 2026 — Ground Control Station</title>
+  <meta name="description"
+    content="IN-SPACe 2026 Model Rocketry Ground Control Station — Real-time telemetry, 3D trajectory, flight state monitoring, and Annexure-2 compliant data export.">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <!-- ════════════════ TOP STATUS BAR ════════════════ -->
+  <header id="status-bar">
+    <div class="status-left">
+      <div class="logo">
+        <span class="logo-icon">🚀</span>
+        <span class="logo-text">IN-SPACe GCS</span>
+      </div>
+      <div class="status-badge" id="connection-badge">
+        <span class="dot offline"></span>
+        <span>DISCONNECTED</span>
+      </div>
+      <div class="status-badge fb-badge" id="firebase-badge">🔥 FIREBASE OFFLINE</div>
+      <div class="team-id-display" id="team-id-display">TEAM: —</div>
+    </div>
+    <div class="status-center">
+      <div class="flight-state" id="flight-state">PRE-FLIGHT</div>
+    </div>
+    <div class="status-right">
+      <div class="met" id="met-display">T+ 00:00:00</div>
+      <button id="btn-connect" class="btn-primary" title="Connect to ESP32 WebSocket">Connect GCS</button>
+      <button id="btn-csv" class="btn-secondary" title="Export CSV">CSV</button>
+    </div>
+  </header>
+
+  <!-- ════════════════ COMMAND PANEL ════════════════ -->
+  <div id="command-panel">
+    <div class="cmd-group">
+      <span class="cmd-label">TELEMETRY</span>
+      <button id="btn-start-tm" class="cmd-btn cmd-green" title="CMD,START_TM">▶ START</button>
+      <button id="btn-stop-tm" class="cmd-btn cmd-red" title="CMD,STOP_TM">■ STOP</button>
+    </div>
+    <div class="cmd-group">
+      <span class="cmd-label">FLIGHT</span>
+      <button id="btn-arm" class="cmd-btn cmd-amber" title="CMD,ARM_ROCKET">⚡ ARM</button>
+      <button id="btn-zero-alt" class="cmd-btn cmd-blue" title="CMD,ZERO_ALT">↕ ZERO ALT</button>
+    </div>
+    <div class="cmd-group">
+      <span class="cmd-label">CAN-7U</span>
+      <button id="btn-cansat-start" class="cmd-btn cmd-green" title="CMD,CANSAT_START">▶ START</button>
+      <button id="btn-cansat-stop" class="cmd-btn cmd-red" title="CMD,CANSAT_STOP">■ STOP</button>
+    </div>
+    <div class="cmd-group">
+      <span class="cmd-label">LINK</span>
+      <span class="cmd-info" id="cmd-baud">WebSocket</span>
+      <span class="cmd-info" id="cmd-pkt-rate">0 pkt/s</span>
+    </div>
+    <div class="cmd-log" id="cmd-log">Ready.</div>
+  </div>
+
+  <!-- ════════════════ PAGE TABS ════════════════ -->
+  <div id="page-tabs">
+    <button class="tab-btn active" id="tab-rocket" onclick="switchTab('rocket')">🚀 ROCKET (LoRa)</button>
+    <button class="tab-btn" id="tab-xbee" onclick="switchTab('xbee')">📶 ROCKET (XBee)</button>
+    <button class="tab-btn" id="tab-cansat" onclick="switchTab('cansat')">🛰 CAN-7U</button>
+  </div>
+
+  <!-- ════════════════ ROCKET PAGE ════════════════ -->
+  <main id="page-rocket" class="tab-page">
+    <!-- FULL WIDTH METRICS HERO -->
+    <div class="metrics-row">
+      <div class="metric-card">
+        <span class="metric-label">ALTITUDE</span>
+        <span class="metric-value" id="val-altitude">0.0</span>
+        <span class="metric-unit">m AGL</span>
+      </div>
+      <div class="metric-card highlight">
+        <span class="metric-label">MAX ALT</span>
+        <span class="metric-value" id="val-max-alt">0.0</span>
+        <span class="metric-unit">m</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">PRESSURE</span>
+        <span class="metric-value" id="val-pressure">--</span>
+        <span class="metric-unit">Pa</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">VOLTAGE</span>
+        <span class="metric-value" id="val-voltage">--</span>
+        <span class="metric-unit">V</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">TEMP</span>
+        <span class="metric-value" id="val-temp">--</span>
+        <span class="metric-unit">°C</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">SATS</span>
+        <span class="metric-value" id="val-sats">0</span>
+        <span class="metric-unit">🛰</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">PACKETS</span>
+        <span class="metric-value" id="val-packets">0</span>
+        <span class="metric-unit">#</span>
+      </div>
+    </div>
+
+    <!-- SECOND ROW: GPS + IMU Telemetry -->
+    <div class="metrics-row metrics-row-2">
+      <div class="metric-card">
+        <span class="metric-label">GNSS TIME</span>
+        <span class="metric-value small" id="val-gnss-time">--</span>
+        <span class="metric-unit">UTC</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">LATITUDE</span>
+        <span class="metric-value small" id="val-lat">0.0000</span>
+        <span class="metric-unit">°N</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">LONGITUDE</span>
+        <span class="metric-value small" id="val-lon">0.0000</span>
+        <span class="metric-unit">°E</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">GNSS ALT</span>
+        <span class="metric-value small" id="val-gnss-alt">0.0</span>
+        <span class="metric-unit">m</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">ACCEL X</span>
+        <span class="metric-value small" id="val-ax">0.00</span>
+        <span class="metric-unit">m/s²</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">ACCEL Y</span>
+        <span class="metric-value small" id="val-ay">0.00</span>
+        <span class="metric-unit">m/s²</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">ACCEL Z</span>
+        <span class="metric-value small" id="val-az">0.00</span>
+        <span class="metric-unit">m/s²</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">GYRO X</span>
+        <span class="metric-value small" id="val-gx">0.0</span>
+        <span class="metric-unit">°/s</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">GYRO Y</span>
+        <span class="metric-value small" id="val-gy">0.0</span>
+        <span class="metric-unit">°/s</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">GYRO Z</span>
+        <span class="metric-value small" id="val-gz">0.0</span>
+        <span class="metric-unit">°/s</span>
+      </div>
+    </div>
+
+    <!-- MAIN GRID (Two Columns) -->
+    <div class="main-content">
+      <!-- ──── LEFT COLUMN: Map + 3D Visuals ──── -->
+      <section class="column col-left">
+        <!-- Live Map -->
+        <div class="card card-map" id="card-map">
+          <div class="card-header">
+            <h2>📡 LIVE TRACKING</h2>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button id="btn-auto-center" class="btn-secondary active" style="padding:2px 8px;font-size:0.6rem;letter-spacing:1px;color:var(--cyan);border-color:var(--cyan);">🎯 AUTO: ON</button>
+              <span class="card-badge" id="gps-status">NO FIX</span>
+            </div>
+          </div>
+          <div id="map"></div>
+        </div>
+
+        <!-- 3D Trajectory -->
+        <div class="card" id="card-3d">
+          <div class="card-header">
+            <h2>🌐 3D TRAJECTORY (XYZ)</h2>
+          </div>
+          <div id="plot-3d" class="chart-container-3d"></div>
+        </div>
+
+        <!-- 3D Rocket Orientation -->
+        <div class="card" id="card-3d-gyro">
+          <div class="card-header">
+            <h2>🚀 3D ROCKET ORIENTATION</h2>
+          </div>
+          <div id="plot-3d-gyro" class="chart-container-3d"></div>
+        </div>
+      </section>
+
+      <!-- ──── RIGHT COLUMN: 2D Line Charts ──── -->
+      <section class="column col-right">
+        <!-- Altitude Chart -->
+        <div class="card" id="card-altitude">
+          <div class="card-header">
+            <h2>📈 ALTITUDE</h2>
+          </div>
+          <div id="plot-altitude" class="chart-container"></div>
+        </div>
+
+        <!-- Velocity Chart -->
+        <div class="card" id="card-velocity">
+          <div class="card-header">
+            <h2>⚡ VELOCITY</h2>
+          </div>
+          <div id="plot-velocity" class="chart-container"></div>
+        </div>
+
+        <!-- Acceleration Chart -->
+        <div class="card" id="card-accel">
+          <div class="card-header">
+            <h2>💥 ACCELERATION</h2>
+          </div>
+          <div id="plot-accel" class="chart-container"></div>
+        </div>
+
+        <!-- Gyroscope Chart -->
+        <div class="card" id="card-gyro">
+          <div class="card-header">
+            <h2>🔄 GYROSCOPE</h2>
+          </div>
+          <div id="plot-gyro" class="chart-container"></div>
+        </div>
+
+        <!-- Temperature -->
+        <div class="card" id="card-temp">
+          <div class="card-header">
+            <h2>🌡️ TEMPERATURE</h2>
+          </div>
+          <div id="plot-temp" class="chart-container"></div>
+        </div>
+
+        <!-- Pressure -->
+        <div class="card" id="card-press">
+          <div class="card-header">
+            <h2>📊 PRESSURE</h2>
+          </div>
+          <div id="plot-press" class="chart-container"></div>
+        </div>
+
+        <!-- Voltage -->
+        <div class="card" id="card-voltage">
+          <div class="card-header">
+            <h2>🔋 POWER</h2>
+          </div>
+          <div id="plot-voltage" class="chart-container"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ════════════════ MISSION CONSOLE ════════════════ -->
+    <div class="card" id="card-console">
+      <div class="card-header">
+        <h2>📋 MISSION LOG</h2>
+        <button id="btn-clear-console" class="btn-secondary" style="padding:3px 10px;font-size:0.65rem;">CLEAR</button>
+      </div>
+      <div id="console-output"></div>
+      <div class="cmd-input-row">
+        <input type="text" id="cmd-input" placeholder="Type command (e.g. CMD,START_TM)" autocomplete="off">
+        <select id="cmd-target"><option value="ROCKET">ROCKET (LoRa)</option><option value="ROCKET_XBEE">ROCKET (XBee)</option><option value="CANSAT">CAN-7U</option></select>
+        <button id="btn-send-cmd" class="btn-primary" style="padding:6px 14px;">SEND</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ════════════════ XBEE ROCKET PAGE ════════════════ -->
+  <main id="page-xbee" class="tab-page hidden">
+    <!-- Metrics Row 1 — identical to LoRa -->
+    <div class="metrics-row">
+      <div class="metric-card">
+        <span class="metric-label">ALTITUDE</span>
+        <span class="metric-value" id="xb-altitude">0.0</span>
+        <span class="metric-unit">m AGL</span>
+      </div>
+      <div class="metric-card highlight">
+        <span class="metric-label">MAX ALT</span>
+        <span class="metric-value" id="xb-max-alt">0.0</span>
+        <span class="metric-unit">m</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">PRESSURE</span>
+        <span class="metric-value" id="xb-pressure">--</span>
+        <span class="metric-unit">Pa</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">VOLTAGE</span>
+        <span class="metric-value" id="xb-voltage">--</span>
+        <span class="metric-unit">V</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">TEMP</span>
+        <span class="metric-value" id="xb-temp">--</span>
+        <span class="metric-unit">°C</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">SATS</span>
+        <span class="metric-value" id="xb-sats">0</span>
+        <span class="metric-unit">🛰</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">PACKETS</span>
+        <span class="metric-value" id="xb-packets">0</span>
+        <span class="metric-unit">#</span>
+      </div>
+    </div>
+    <!-- Metrics Row 2 — GPS + IMU -->
+    <div class="metrics-row metrics-row-2">
+      <div class="metric-card"><span class="metric-label">GNSS TIME</span><span class="metric-value small" id="xb-gnss-time">--</span><span class="metric-unit">UTC</span></div>
+      <div class="metric-card"><span class="metric-label">LATITUDE</span><span class="metric-value small" id="xb-lat">0.0000</span><span class="metric-unit">°N</span></div>
+      <div class="metric-card"><span class="metric-label">LONGITUDE</span><span class="metric-value small" id="xb-lon">0.0000</span><span class="metric-unit">°E</span></div>
+      <div class="metric-card"><span class="metric-label">GNSS ALT</span><span class="metric-value small" id="xb-gnss-alt">0.0</span><span class="metric-unit">m</span></div>
+      <div class="metric-card"><span class="metric-label">ACCEL X</span><span class="metric-value small" id="xb-ax">0.00</span><span class="metric-unit">m/s²</span></div>
+      <div class="metric-card"><span class="metric-label">ACCEL Y</span><span class="metric-value small" id="xb-ay">0.00</span><span class="metric-unit">m/s²</span></div>
+      <div class="metric-card"><span class="metric-label">ACCEL Z</span><span class="metric-value small" id="xb-az">0.00</span><span class="metric-unit">m/s²</span></div>
+      <div class="metric-card"><span class="metric-label">GYRO X</span><span class="metric-value small" id="xb-gx">0.0</span><span class="metric-unit">°/s</span></div>
+      <div class="metric-card"><span class="metric-label">GYRO Y</span><span class="metric-value small" id="xb-gy">0.0</span><span class="metric-unit">°/s</span></div>
+      <div class="metric-card"><span class="metric-label">GYRO Z</span><span class="metric-value small" id="xb-gz">0.0</span><span class="metric-unit">°/s</span></div>
+    </div>
+    <!-- Main Grid — identical column layout to LoRa -->
+    <div class="main-content">
+      <!-- LEFT: Map + 3D -->
+      <section class="column col-left">
+        <div class="card card-map" id="xb-card-map">
+          <div class="card-header">
+            <h2>📶 XBEE LIVE TRACKING</h2>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button id="btn-auto-center-xb" class="btn-secondary active" style="padding:2px 8px;font-size:0.6rem;letter-spacing:1px;color:#a855f7;border-color:#a855f7;">🎯 AUTO: ON</button>
+              <span class="card-badge" id="xb-gps-status">NO FIX</span>
+            </div>
+          </div>
+          <div id="map-xbee"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>🌐 XBEE 3D TRAJECTORY</h2></div>
+          <div id="xb-plot-3d" class="chart-container-3d"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>🚀 XBEE ORIENTATION</h2></div>
+          <div id="xb-plot-3d-gyro" class="chart-container-3d"></div>
+        </div>
+      </section>
+      <!-- RIGHT: 2D Charts -->
+      <section class="column col-right">
+        <div class="card"><div class="card-header"><h2>📈 ALTITUDE</h2></div><div id="xb-plot-altitude" class="chart-container"></div></div>
+        <div class="card"><div class="card-header"><h2>⚡ VELOCITY</h2></div><div id="xb-plot-velocity" class="chart-container"></div></div>
+        <div class="card"><div class="card-header"><h2>💥 ACCELERATION</h2></div><div id="xb-plot-accel" class="chart-container"></div></div>
+        <div class="card"><div class="card-header"><h2>🔄 GYROSCOPE</h2></div><div id="xb-plot-gyro" class="chart-container"></div></div>
+        <div class="card"><div class="card-header"><h2>🌡️ TEMPERATURE</h2></div><div id="xb-plot-temp" class="chart-container"></div></div>
+        <div class="card"><div class="card-header"><h2>📊 PRESSURE</h2></div><div id="xb-plot-press" class="chart-container"></div></div>
+        <div class="card"><div class="card-header"><h2>🔋 POWER</h2></div><div id="xb-plot-voltage" class="chart-container"></div></div>
+      </section>
+    </div>
+  </main>
+
+
+  <!-- ════════════════ CAN-7U SATELLITE PAGE ════════════════ -->
+  <main id="page-cansat" class="tab-page hidden">
+    <div class="cansat-header" style="padding:16px 10px 10px;">
+      <h2>🛰 CAN-7U SATELLITE TELEMETRY</h2>
+      <span class="card-badge" id="cansat-status">INACTIVE</span>
+    </div>
+    <div class="metrics-row metrics-row-cansat" style="padding:0 10px;">
+      <div class="metric-card cansat-card"><span class="metric-label">ALT</span><span class="metric-value small" id="cs-alt">0.0</span><span class="metric-unit">m</span></div>
+      <div class="metric-card cansat-card"><span class="metric-label">PRESS</span><span class="metric-value small" id="cs-press">--</span><span class="metric-unit">Pa</span></div>
+      <div class="metric-card cansat-card"><span class="metric-label">TEMP</span><span class="metric-value small" id="cs-temp">--</span><span class="metric-unit">°C</span></div>
+      <div class="metric-card cansat-card"><span class="metric-label">ACCEL X</span><span class="metric-value small" id="cs-ax">0.00</span><span class="metric-unit">m/s²</span></div>
+      <div class="metric-card cansat-card"><span class="metric-label">ACCEL Y</span><span class="metric-value small" id="cs-ay">0.00</span><span class="metric-unit">m/s²</span></div>
+      <div class="metric-card cansat-card"><span class="metric-label">ACCEL Z</span><span class="metric-value small" id="cs-az">0.00</span><span class="metric-unit">m/s²</span></div>
+      <div class="metric-card cansat-card"><span class="metric-label">LAT</span><span class="metric-value small" id="cs-lat">0.0000</span><span class="metric-unit">°</span></div>
+      <div class="metric-card cansat-card"><span class="metric-label">LON</span><span class="metric-value small" id="cs-lon">0.0000</span><span class="metric-unit">°</span></div>
+      <div class="metric-card cansat-card"><span class="metric-label">SATS</span><span class="metric-value small" id="cs-sats">0</span><span class="metric-unit">🛰</span></div>
+      <div class="metric-card cansat-card"><span class="metric-label">STATE</span><span class="metric-value small" id="cs-state">IDLE</span><span class="metric-unit">—</span></div>
+    </div>
+    <div class="main-content" style="padding:10px;">
+      <section class="column">
+        <div class="card"><div class="card-header"><h2>🛰 CAN-7U ALTITUDE</h2></div><div id="plot-cs-alt" class="chart-container"></div></div>
+        <div class="card"><div class="card-header"><h2>🌡️ CAN-7U TEMPERATURE</h2></div><div id="plot-cs-temp" class="chart-container"></div></div>
+        <div class="card"><div class="card-header"><h2>📊 CAN-7U PRESSURE</h2></div><div id="plot-cs-press" class="chart-container"></div></div>
+      </section>
+      <section class="column">
+        <div class="card"><div class="card-header"><h2>📡 CAN-7U LOCATION</h2>
+          <button id="btn-auto-center-cs" class="btn-secondary active" style="padding:2px 8px;font-size:0.6rem;letter-spacing:1px;color:var(--amber);border-color:var(--amber);">🎯 AUTO: ON</button>
+        </div><div id="map-cansat" style="height:400px;background:#080c18;"></div></div>
+        <div class="card"><div class="card-header"><h2>💥 CAN-7U ACCELERATION</h2></div><div id="plot-cs-accel" class="chart-container"></div></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ════════════════ SCRIPTS ════════════════ -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
