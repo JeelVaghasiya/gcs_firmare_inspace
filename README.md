@@ -2,8 +2,9 @@
 
 | Page | For | What it does |
 |---|---|---|
-| `index.html` | GCS laptop (Chrome / Edge) | Web Serial to the Teensy ground station (`inspace_ground_modular`), 3 live stations, commands, CSV, **Firebase upload** |
-| `viewer.html` | everyone else, phone or laptop | read-only; follows whatever mission the GCS is uploading |
+| `index.html` | Public viewer (GitHub Pages root) | Read-only live spectator view; follows whatever mission the GCS is uploading |
+| `gcs.html` | GCS operator laptop (Chrome / Edge) | Web Serial to the Teensy ground station (`inspace_ground_modular`), 3 live stations, commands, CSV, **Firebase upload** |
+| `viewer.html` | Redirect alias | Automatically forwards to `index.html` for backward compatibility |
 
 Tabs = the three radio links of the ground station:
 
@@ -21,7 +22,7 @@ voltage + current.
 
 ## Run the GCS
 ```
-python serve.py        # http://localhost:8000/index.html
+python serve.py        # Opens http://localhost:8000/gcs.html (GCS) and http://localhost:8000/index.html (Viewer)
 ```
 Web Serial needs `localhost` or https (GitHub Pages works too). **Connect GCS** → pick the Teensy.
 **DEMO** (or Shift+D) runs a simulated two-vehicle flight through the same code path, including upload.
@@ -49,5 +50,5 @@ Create that user (Authentication → Email/Password), put its email in the rules
 same email/password in the GCS dialog. If the database is still in test mode, uploads work without signing in.
 
 ## Host the viewer on GitHub Pages
-Push this folder, Settings → Pages → branch `main`, root. Viewer URL:
-`https://<user>.github.io/<repo>/viewer.html`.
+Push this folder, Settings → Pages → branch `main` (or `master`), root (`/`). Viewer URL:
+`https://<user>.github.io/<repo>/` (loads `index.html` directly).

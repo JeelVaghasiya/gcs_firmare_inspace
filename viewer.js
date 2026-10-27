@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════════════
- *  IN-SPACe 2026 — Team 003 view-only dashboard (viewer.html)
+ *  IN-SPACe 2026 — Team 003 view-only dashboard (index.html)
  *  Follows the mission the GCS is uploading: <root>/meta.missionId, then
  *  streams <root>/missions/<id>/<station> (last 900 packets + new ones).
  * ════════════════════════════════════════════════════════════════════════════ */

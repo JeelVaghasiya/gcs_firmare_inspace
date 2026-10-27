@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════════════
- *  IN-SPACe 2026 — Team 003 GCS controller (index.html)
+ *  IN-SPACe 2026 — Team 003 GCS controller (gcs.html)
  *  Web Serial <-> Teensy ground station (inspace_ground_modular), commands,
  *  CSV export, Firebase live upload. Rendering lives in core.js.
  * ════════════════════════════════════════════════════════════════════════════ */
@@ -261,7 +261,7 @@ GCS.startRenderLoop();
 mlog('IN-SPACe 2026 GCS — Team 003 · Payload (LoRa + XBee) · CanSat (XBee) · Firebase', 'log-ok');
 mlog('Connect GCS = Teensy ground station over USB (Chrome/Edge). DEMO or Shift+D = simulated flight.', 'log-info');
 mlog('Commands go to the TARGET selected in the command bar; ground station adds CMD,003, and routes them.', 'log-info');
-if (!('serial' in navigator)) mlog('This browser has no Web Serial: live USB link unavailable here (viewer.html works anywhere).', 'log-warn');
+if (!('serial' in navigator)) mlog('This browser has no Web Serial: live USB link unavailable here (index.html viewer works anywhere).', 'log-warn');
 if (typeof firebase === 'undefined') mlog('Firebase SDK not loaded (offline?): upload disabled', 'log-warn');
 else if ($('fb-auto').checked) fbStart();
 })();

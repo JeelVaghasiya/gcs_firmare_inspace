@@ -13,8 +13,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 socketserver.TCPServer.allow_reuse_address = True
 with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as httpd:
-    url = f"http://localhost:{PORT}/index.html"
-    print(f"Ground console: {url}\nLive view:      http://localhost:{PORT}/viewer.html\nCtrl+C to stop.")
+    url = f"http://localhost:{PORT}/gcs.html"
+    print(f"Ground console: {url}\nLive view:      http://localhost:{PORT}/index.html\nCtrl+C to stop.")
     webbrowser.open(url)
     try:
         httpd.serve_forever()

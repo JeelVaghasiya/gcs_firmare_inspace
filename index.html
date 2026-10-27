@@ -3,11 +3,10 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IN-SPACe 2026 — Team 003 Ground Control Station</title>
-  <meta name="description"
-    content="IN-SPACe 2026 Team 003 Ground Control Station: CanSat + Payload telemetry over XBee and LoRa, commands, Firebase live upload.">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>IN-SPACe 2026 — Team 003 Live</title>
+  <meta name="description" content="Live telemetry from IN-SPACe 2026 Team 003: CanSat and Payload, read-only.">
+  <meta name="theme-color" content="#020408">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -15,144 +14,44 @@
   <link rel="stylesheet" href="style.css">
 </head>
 
-<body>
-  <!-- ════════════════ TOP STATUS BAR ════════════════ -->
+<body class="viewer">
   <header id="status-bar">
     <div class="status-left">
       <div class="logo">
-        <span class="logo-icon">🚀</span>
-        <span class="logo-text">IN-SPACe GCS</span>
+        <span class="logo-icon">📡</span>
+        <span class="logo-text">TEAM 003 LIVE</span>
       </div>
-      <div class="status-badge" id="connection-badge"><span class="dot offline"></span><span>DISCONNECTED</span></div>
-      <button class="status-badge fb-badge" id="firebase-badge" title="Firebase upload settings">🔥 FIREBASE OFF</button>
+      <div class="status-badge" id="connection-badge"><span class="dot offline"></span><span>CONNECTING</span></div>
+      <div class="status-badge fb-badge" id="firebase-badge">🔥 FIREBASE OFFLINE</div>
       <div class="team-id-display" id="team-id-display">TEAM 003</div>
     </div>
     <div class="status-center">
       <div class="flight-state" id="flight-state">PRE-FLIGHT</div>
     </div>
     <div class="status-right">
+      <span class="viewer-badge">👁 VIEW ONLY</span>
       <div class="met" id="met-display">T+ 00:00:00</div>
-      <button id="btn-connect" class="btn-primary" title="Connect the Teensy ground station over USB (Web Serial)">Connect GCS</button>
-      <button id="btn-demo" class="btn-secondary" title="Simulated flight for both vehicles (Shift+D)">DEMO</button>
-      <button id="btn-csv" class="btn-secondary" title="Export one 29-field CSV per link">CSV</button>
     </div>
   </header>
 
-  <!-- ════════════════ COMMAND PANEL ════════════════ -->
-  <div id="command-panel">
-    <div class="cmd-group">
-      <span class="cmd-label">TARGET</span>
-      <div class="seg" id="cmd-seg">
-        <button data-t="PAY" class="on">PAYLOAD</button>
-        <button data-t="CAN">CANSAT</button>
-        <button data-t="ALL">BOTH</button>
-      </div>
-    </div>
-    <div class="cmd-group">
-      <span class="cmd-label">TELEMETRY</span>
-      <button class="cmd-btn cmd-green" data-cmd="CX,ON" title="CMD,003,CX,ON">▶ START</button>
-      <button class="cmd-btn cmd-red" data-cmd="CX,OFF" title="CMD,003,CX,OFF">■ STOP</button>
-      <button class="cmd-btn cmd-blue" data-cmd="PING">PING</button>
-    </div>
-    <div class="cmd-group">
-      <span class="cmd-label">PAD</span>
-      <button class="cmd-btn cmd-blue" data-cmd="CAL" title="Zero altitude, gyro, accel, roll/pitch (keep still)">↕ CAL</button>
-      <button class="cmd-btn cmd-blue" data-cmd="ST,GPS" title="Set RTC from GPS">⏱ GPS TIME</button>
-      <button class="cmd-btn cmd-amber" data-cmd="MODE,FLIGHT" title="Arm: LAUNCH_PAD state">⚡ FLIGHT</button>
-      <button class="cmd-btn cmd-blue" data-cmd="MODE,TEST" title="TEST_MODE: allows actuator tests">TEST</button>
-    </div>
-    <div class="cmd-group">
-      <span class="cmd-label">LEGS</span>
-      <button class="cmd-btn cmd-green" data-cmd="ACT,DEPLOY" title="Test mode only">DEPLOY</button>
-      <button class="cmd-btn cmd-amber" data-cmd="ACT,STOW" title="Test mode only">STOW</button>
-      <button class="cmd-btn cmd-blue" data-cmd="ACT,BEEP">BEEP</button>
-      <button class="cmd-btn cmd-blue" id="btn-legtest" title="CX ON → TEST → DEPLOY → check switch → STOW → FLIGHT">AUTO TEST</button>
-    </div>
-    <div class="cmd-group">
-      <span class="cmd-label">RADIO</span>
-      <button class="cmd-btn cmd-blue" data-cmd="XCH,MAIN">XBEE M</button>
-      <button class="cmd-btn cmd-blue" data-cmd="XCH,BACKUP">XBEE B</button>
-      <button class="cmd-btn cmd-blue" data-cmd="LCH,MAIN" data-pay>LORA M</button>
-      <button class="cmd-btn cmd-blue" data-cmd="LCH,BACKUP" data-pay>LORA B</button>
-    </div>
-    <div class="cmd-group">
-      <span class="cmd-label">SYSTEM</span>
-      <button class="cmd-btn cmd-red" data-cmd="RESET" data-confirm="Reset mission time and packet counter?">RESET</button>
-      <button class="cmd-btn cmd-red" data-cmd="REBOOT" data-confirm="Reboot the flight computer?">REBOOT</button>
-      <button class="cmd-btn cmd-blue" data-local="STATS" title="Ground station link statistics">GS STATS</button>
-      <button class="cmd-btn cmd-blue" data-local="SETUP" title="Re-configure all ground radios">GS SETUP</button>
-    </div>
-    <div class="cmd-group">
-      <span class="cmd-label">LINK</span>
-      <span class="cmd-info" id="cmd-baud">USB 115200</span>
-      <span class="cmd-info" id="cmd-pkt-rate">0 pkt/s</span>
-    </div>
-    <div class="cmd-log" id="cmd-log">Ready.</div>
-  </div>
+  <div class="mission-bar" id="mission-bar">Waiting for the ground station to start a mission…</div>
 
-  <!-- ════════════════ PAGE TABS + STATION PAGES (built by core.js) ════════════════ -->
   <nav id="page-tabs"></nav>
   <div id="pages"></div>
 
-  <!-- ════════════════ MISSION CONSOLE ════════════════ -->
   <div class="console-wrap">
     <div class="card" id="card-console">
-      <div class="card-header">
-        <h2>📋 MISSION LOG</h2>
-        <div class="hdr-tools">
-          <label class="chk"><input type="checkbox" id="chk-raw"> RAW PACKETS</label>
-          <button id="btn-clear-console" class="btn-secondary btn-mini">CLEAR</button>
-        </div>
-      </div>
+      <div class="card-header"><h2>📋 MISSION EVENTS</h2></div>
       <div id="console-output"></div>
-      <div class="cmd-input-row">
-        <input type="text" id="cmd-input" placeholder="Command, e.g. CX,ON  SIMP,95000  or ground: STATS / PROUTE,LORA / GCH,PL,BACKUP" autocomplete="off">
-        <select id="cmd-target">
-          <option value="PAY">PAYLOAD</option>
-          <option value="CAN">CANSAT</option>
-          <option value="ALL">BOTH</option>
-          <option value="GS">GROUND STN</option>
-        </select>
-        <button id="btn-send-cmd" class="btn-primary">SEND</button>
-      </div>
     </div>
   </div>
 
-  <!-- ════════════════ FIREBASE DIALOG ════════════════ -->
-  <dialog id="fb-dialog">
-    <form method="dialog" class="dlg">
-      <h2>🔥 FIREBASE LIVE UPLOAD</h2>
-      <p>Paste the web-app config from Firebase console → Project settings → Your apps. It must contain <code>databaseURL</code>.
-        Everyone opening <code>viewer.html</code> sees what this GCS uploads.</p>
-      <label>CONFIG
-        <textarea id="fb-config" spellcheck="false"></textarea>
-      </label>
-      <div class="two">
-        <label>DATABASE PATH <input id="fb-root" value="gcs/003"></label>
-        <label>MISSION NAME <input id="fb-mission" placeholder="auto: date-time"></label>
-      </div>
-      <div class="two">
-        <label>EMAIL (optional) <input id="fb-email" type="email" autocomplete="username" placeholder="only if rules need auth"></label>
-        <label>PASSWORD <input id="fb-pass" type="password" autocomplete="current-password"></label>
-      </div>
-      <label class="chk"><input type="checkbox" id="fb-auto"> Start uploading automatically when this page opens</label>
-      <div class="dlg-status" id="fb-status"></div>
-      <div class="dlg-actions">
-        <button class="btn-secondary" value="close">CLOSE</button>
-        <button class="btn-secondary" type="button" id="fb-stop">STOP UPLOAD</button>
-        <button class="btn-primary" type="button" id="fb-start">CONNECT &amp; UPLOAD</button>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- ════════════════ SCRIPTS ════════════════ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="firebase-config.js"></script>
   <script src="core.js"></script>
-  <script src="app.js"></script>
+  <script src="viewer.js"></script>
 </body>
 </html>

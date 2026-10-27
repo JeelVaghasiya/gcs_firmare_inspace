@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════════════
- *  IN-SPACe 2026 — Team 003 GCS core (shared by index.html and viewer.html)
+ *  IN-SPACe 2026 — Team 003 GCS core (shared by gcs.html and index.html)
  *
  *  Three stations, one per radio link of the Team 003 ground station:
  *    pl  Payload over LoRa 868   (ground line tag PL)
