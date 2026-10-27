@@ -1,0 +1,11 @@
+{
+  "rules": {
+    "gcs": {
+      "003": {
+        ".read": true,
+        ".write": "auth != null && auth.token.email == 'groundstation@your-team.example'",
+        "missions": { "$mission": { "$station": { ".indexOn": ["n"] } } }
+      }
+    }
+  }
+}
